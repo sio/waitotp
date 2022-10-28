@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -16,18 +17,45 @@ import (
 
 const (
 	MaxMessageLength  = 10
-	ListenAddr        = "127.0.0.1"
-	ListenPort        = 19991
-	TotpSecret        = "sampletotpsecret"
 	ConnectionTimeout = 10 * time.Second
+	TotpEnvVariable   = "TOTP_SECRET"
 )
 
+// Parse CLI arguments
+type Config struct {
+	Protocol   string
+	IP         string
+	Port       int
+	TotpSecret string
+}
+
+func (conf *Config) Address() string {
+	return fmt.Sprintf("%s:%d", conf.IP, conf.Port)
+}
+func (conf *Config) Parse() {
+	conf.Protocol = "tcp" // TODO: other protocols are not supported yet
+	flag.StringVar(&conf.IP, "ip", "127.0.0.1", "IP address to bind to")
+	flag.IntVar(&conf.Port, "port", 20002, fmt.Sprintf("%s port to listen on", conf.Protocol))
+	flag.Parse()
+	var ok bool
+	conf.TotpSecret, ok = os.LookupEnv(TotpEnvVariable)
+	if !ok {
+		log.Fatal("environment variable not defined: ", TotpEnvVariable)
+	}
+}
+
+var conf Config // global variable
+
+// CLI entrypoint
 func main() {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ListenAddr, ListenPort))
+	conf.Parse()
+
+	listener, err := net.Listen(conf.Protocol, conf.Address())
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer listener.Close()
+	log.Printf("%s listening on %s", os.Args[0], conf.Address())
 
 	limit := rate.NewLimiter(1/2, 2)
 	for {
@@ -62,7 +90,7 @@ func handle(conn net.Conn, limit *rate.Limiter) {
 		return
 	}
 	log.Printf("received TOTP code from %s (%d bytes)", conn.RemoteAddr(), n)
-	if totp.Validate(code, TotpSecret) {
+	if totp.Validate(code, conf.TotpSecret) {
 		log.Printf("TOTP code is valid, exiting...")
 		os.Exit(0)
 	}
