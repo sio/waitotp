@@ -1,0 +1,15 @@
+# Wait until related service stops using network
+#
+# Save this file to /etc/systemd/system/inactivity-1m@.service
+# (for other sleep intervals consult `man sleep`)
+#
+# If Restart= is not specified, both this and related service will be stopped
+# after detecting network inactivity
+
+[Unit]
+Description=Wait until %i is not using network for %j
+BindTo=%i.service
+
+[Service]
+ExecStart=/usr/local/bin/inactivity %j %i
+Restart=always
