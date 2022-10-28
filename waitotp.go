@@ -29,7 +29,7 @@ func main() {
 	}
 	defer listener.Close()
 
-	limit := rate.NewLimiter(0.5, 2)
+	limit := rate.NewLimiter(1/2, 2)
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
