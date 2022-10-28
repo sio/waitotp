@@ -1,4 +1,4 @@
-module github.com/sio/udptotp
+module github.com/sio/waitotp
 
 go 1.18
 
