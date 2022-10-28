@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/pquerna/otp/totp"
@@ -14,39 +15,56 @@ import (
 )
 
 const (
-	MaxMessageLength = 10
-	ListenAddr       = "127.0.0.1"
-	ListenPort       = 19991
-	TotpSecret       = "sampletotpsecret"
+	MaxMessageLength  = 10
+	ListenAddr        = "127.0.0.1"
+	ListenPort        = 19991
+	TotpSecret        = "sampletotpsecret"
+	ConnectionTimeout = 10 * time.Second
 )
 
 func main() {
-	conn, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", ListenAddr, ListenPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ListenAddr, ListenPort))
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer listener.Close()
+
+	limit := rate.NewLimiter(0.5, 2)
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			continue
+		}
+		go handle(conn, limit)
+	}
+}
+
+// Handle a single TCP session
+func handle(conn net.Conn, limit *rate.Limiter) {
+	// TCP hygiene
+	conn.SetDeadline(time.Now().Add(ConnectionTimeout))
 	defer conn.Close()
 
-	rateLimit := rate.NewLimiter(0.5, 2)
-	for {
-		buf := make([]byte, MaxMessageLength)
-		n, addr, err := conn.ReadFrom(buf)
-		if n == 0 || err != nil {
-			continue
-		}
-		code, err := parseTotpCode(buf[:n])
-		if err != nil {
-			log.Printf("invalid input from %s (%d bytes)", addr, n)
-			continue
-		}
-		if !rateLimit.Allow() {
-			continue
-		}
-		log.Printf("received TOTP code from %s (%d bytes)", addr, n)
-		if totp.Validate(code, TotpSecret) {
-			log.Printf("TOTP code is valid, exiting...")
-			os.Exit(0)
-		}
+	// We only care about the first buffer
+	buf := make([]byte, MaxMessageLength)
+	n, err := conn.Read(buf)
+	if err != nil {
+		log.Printf("error: %s", err)
+		return
+	}
+	code, err := parseTotpCode(buf[:n])
+	if err != nil {
+		log.Printf("invalid input from %s (%d bytes)", conn.RemoteAddr(), n)
+		return
+	}
+	if !limit.Allow() {
+		log.Printf("rate limit for TOTP verification exceeded")
+		return
+	}
+	log.Printf("received TOTP code from %s (%d bytes)", conn.RemoteAddr(), n)
+	if totp.Validate(code, TotpSecret) {
+		log.Printf("TOTP code is valid, exiting...")
+		os.Exit(0)
 	}
 }
 
