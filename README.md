@@ -6,13 +6,13 @@ services on Internet.
 
 ## Service lifecycle (systemd)
 
-- Guarded service startup is delayed by a call to [waitotp], this is achieved
-  by overriding parts of the unit file (see [waitotp.conf] for example)
-- [waitotp] listens on guarded service port but does not expose the service
+- Startup of the guarded service is delayed by a call to [waitotp], this is
+  achieved by overriding parts of the unit file (see [waitotp.conf] for example)
+- [waitotp] listens on the guarded service port but does not expose the service
   itself and does not reply to any incoming packets
 - If a valid TOTP token is received, [waitotp] exits and lets the guarded
   service to proceed with startup
-- Immediately after guarded service becomes active, systemd launches the
+- Immediately after the guarded service becomes active, systemd launches
   related [inactivity-@.service]
 - [inactivity.sh] tracks network usage of the guarded service and if it is
   inactive for a specified amount of time, [inactivity-@.service] restarts
