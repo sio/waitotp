@@ -17,7 +17,15 @@ build:
 
 .PHONY: build-all
 build-all:
-	cd $(BUILD_DIR) && find -type f ! -name SHA256SUMS | cut -c3- | xargs sha256sum > SHA256SUMS
+	cd $(BUILD_DIR) && find -type f \
+	| cut -c3- \
+	| while read NAME; do mv "$$NAME" "$$(echo "$$NAME"|sed 's:/:-:g')"; done
+	find $(BUILD_DIR) -type d -empty -print -delete
+	cd $(BUILD_DIR) && find -type f ! -name SHA256SUMS \
+	| cut -c3- \
+	| sort \
+	| xargs sha256sum \
+	| tee SHA256SUMS
 
 
 .PHONY: clean
