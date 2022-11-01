@@ -57,7 +57,7 @@ func main() {
 	defer listener.Close()
 	log.Printf("%s listening on %s", os.Args[0], conf.Address())
 
-	limit := rate.NewLimiter(1/2, 2)
+	limit := rate.NewLimiter(1/2.0, 2)
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
